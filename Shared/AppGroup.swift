@@ -15,6 +15,6 @@ enum SettingsKey {
     static let liveAppearance = "sidenote.liveAppearance"
     static let liveEntryID = "sidenote.liveEntryID"
     static let draft = "sidenote.draft"
-    static let discoveredEarlier = "sidenote.discoveredEarlier"
     static let lastBackgroundDate = "sidenote.lastBackgroundDate"
+    static let widgetSnapshot = "sidenote.widgetSnapshot"
 }

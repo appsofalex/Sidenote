@@ -3,13 +3,14 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @Environment(SidenoteSettings.self) private var settings
     @Environment(\.requestReview) private var requestReview
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: 24) {
                     SettingsCard {
                         SettingsRow(systemImage: "circle.lefthalf.filled", title: "Appearance") {
                             Menu {
@@ -26,20 +27,34 @@ struct SettingsView: View {
                             }
                         }
 
-                        Divider().padding(.leading, 44)
+                        SettingsDivider()
 
                         NavigationLink {
                             TextSettingsView()
                         } label: {
-                            SettingsRow(systemImage: "textformat", title: "Text") {
+                            SettingsRow(systemImage: "doc.text", title: "Note Text") {
                                 Image(systemName: "chevron.right")
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.tertiary)
                             }
                         }
+                        .buttonStyle(.plain)
                     }
 
                     SettingsCard {
+                        NavigationLink {
+                            WidgetSettingsView()
+                        } label: {
+                            SettingsRow(systemImage: "square.grid.2x2", title: "Widget") {
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        SettingsDivider()
+
                         NavigationLink {
                             LiveActivitySettingsView()
                         } label: {
@@ -49,9 +64,23 @@ struct SettingsView: View {
                                     .foregroundStyle(.tertiary)
                             }
                         }
+                        .buttonStyle(.plain)
                     }
 
                     SettingsCard {
+                        Button {
+                            if let url = URL(string: "mailto:alexwalters148@gmail.com?subject=Sidenote%20Feedback") {
+                                openURL(url)
+                            }
+                        } label: {
+                            SettingsRow(systemImage: "bubble.left", title: "Give Feedback") {
+                                EmptyView()
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        SettingsDivider()
+
                         Button {
                             requestReview()
                         } label: {
@@ -59,37 +88,23 @@ struct SettingsView: View {
                                 EmptyView()
                             }
                         }
+                        .buttonStyle(.plain)
 
-                        Divider().padding(.leading, 44)
+                        SettingsDivider()
 
                         NavigationLink {
-                            PrivacyView()
+                            AboutView()
                         } label: {
-                            SettingsRow(systemImage: "hand.raised", title: "Privacy") {
+                            SettingsRow(systemImage: "info.circle", title: "About Sidenote") {
                                 Image(systemName: "chevron.right")
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.tertiary)
                             }
                         }
+                        .buttonStyle(.plain)
                     }
 
-                    VStack(spacing: 8) {
-                        Image(systemName: "text.alignleft")
-                            .font(.system(size: 28, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 64, height: 64)
-                            .background(
-                                Color(uiColor: .secondarySystemGroupedBackground),
-                                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            )
-                        Text("Sidenote")
-                            .font(.headline)
-                        Text(versionString)
-                            .font(.footnote)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(.top, 24)
-                    .padding(.bottom, 40)
+                    SettingsFooter(versionString: versionString)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
@@ -98,19 +113,17 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    CircleIconButton(action: { dismiss() }, accessibilityLabel: "Close") {
-                        Image(systemName: "xmark")
-                    }
-                }
+                CloseToolbarButton(action: { dismiss() })
             }
         }
+        // Sheets don't inherit root preferredColorScheme updates while presented.
+        .preferredColorScheme(settings.appearance.colorScheme)
+        .id(settings.appearance)
     }
 
     private var versionString: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-        return "Version \(version) (\(build))"
+        return "Version \(version)"
     }
 }
 
@@ -119,7 +132,7 @@ struct TextSettingsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: 24) {
                 Text("The quick brown fox jumps over the lazy dog")
                     .font(settings.streamFont)
                     .multilineTextAlignment(.center)
@@ -143,30 +156,65 @@ struct TextSettingsView: View {
                     }
                 }
 
-                SettingsCard {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Size")
-                        Picker("Size", selection: Bindable(settings).textSize) {
-                            ForEach(SidenoteTextSize.allCases) { size in
-                                Text(size.displayName).tag(size)
+                VStack(alignment: .leading, spacing: 8) {
+                    SettingsCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Size")
+                                .font(.body)
+                            Picker("Size", selection: Bindable(settings).textSize) {
+                                ForEach(SidenoteTextSize.allCases) { size in
+                                    Text(size.displayName).tag(size)
+                                }
                             }
+                            .pickerStyle(.segmented)
                         }
-                        .pickerStyle(.segmented)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 16)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                }
 
-                Text("Text size is used in the app and on Live Activities. The preview is not exact.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
+                    Text("Text size is used in the app, on widgets, and on Live Activities. The preview is not exact.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 16)
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 8)
         }
         .background(Color(uiColor: .systemGroupedBackground))
-        .navigationTitle("Text")
+        .navigationTitle("Note Text")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct WidgetSettingsView: View {
+    @Environment(SidenoteSettings.self) private var settings
+
+    private let previewText = "Collect my parcel from the post office after lunch."
+
+    var body: some View {
+        ScrollView {
+            SettingsFeatureCard {
+                HomeScreenWidgetPreview(
+                    text: previewText,
+                    font: settings.streamFont
+                )
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Home Screen Widget")
+                        .font(.headline)
+                    Text("Go to your Home Screen, then tap and hold an empty area until the Edit button appears in the top-left corner. Tap Edit > Add Widget, search for Sidenote, choose a widget size, and tap Add Widget.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 32)
+        }
+        .background(Color(uiColor: .systemGroupedBackground))
+        .navigationTitle("Widget")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -174,20 +222,26 @@ struct TextSettingsView: View {
 struct LiveActivitySettingsView: View {
     @Environment(SidenoteSettings.self) private var settings
 
+    private let previewText = "Collect my parcel from the post office after lunch."
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                LiveActivityPreview(
-                    text: "Collect my parcel from the post office after lunch.",
-                    appearance: settings.liveAppearance
-                )
+            VStack(alignment: .leading, spacing: 24) {
+                SettingsFeatureCard {
+                    LiveActivityPreview(
+                        text: previewText,
+                        appearance: settings.liveAppearance,
+                        animated: true
+                    )
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Live Activity")
-                        .font(.headline)
-                    Text("After you go live, a sidenote can appear on the Lock Screen and in the Dynamic Island on supported iPhones. It can remain active for up to 8 hours.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Live Activity")
+                            .font(.headline)
+                        Text("After you go live, a sidenote can appear on the Lock Screen and in the Dynamic Island on supported iPhones. It can remain active for up to 8 hours.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -211,10 +265,10 @@ struct LiveActivitySettingsView: View {
                                     }
                                 }
                                 .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
+                                .frame(minHeight: 56)
                             }
                             if index < LiveAppearance.allCases.count - 1 {
-                                Divider().padding(.leading, 16)
+                                SettingsDivider(leadingInset: 16)
                             }
                         }
                     }
@@ -235,7 +289,7 @@ struct LiveActivitySettingsView: View {
     }
 }
 
-struct PrivacyView: View {
+struct AboutView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -247,7 +301,7 @@ struct PrivacyView: View {
             .padding(20)
         }
         .background(Color(uiColor: .systemGroupedBackground))
-        .navigationTitle("Privacy")
+        .navigationTitle("About Sidenote")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -261,8 +315,34 @@ struct SettingsCard<Content: View>: View {
         }
         .background(
             Color(uiColor: .secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            in: RoundedRectangle(cornerRadius: 26, style: .continuous)
         )
+    }
+}
+
+struct SettingsFeatureCard<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            content
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color(uiColor: .secondarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: 26, style: .continuous)
+        )
+    }
+}
+
+struct SettingsDivider: View {
+    static let rowLeadingInset: CGFloat = 56
+
+    var leadingInset: CGFloat = SettingsDivider.rowLeadingInset
+
+    var body: some View {
+        Divider().padding(.leading, leadingInset)
     }
 }
 
@@ -272,41 +352,163 @@ struct SettingsRow<Trailing: View>: View {
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             if let systemImage {
                 Image(systemName: systemImage)
-                    .font(.body)
-                    .frame(width: 28)
+                    .font(.system(size: 20))
+                    .frame(width: 26, alignment: .center)
             }
             Text(title)
-            Spacer()
+                .font(.body)
+            Spacer(minLength: 0)
             trailing
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .frame(minHeight: 56)
         .contentShape(Rectangle())
     }
 }
 
-struct LiveActivityPreview: View {
+struct SettingsFooter: View {
+    var versionString: String
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "text.alignleft")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 64, height: 64)
+                .background(
+                    Color(uiColor: .secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
+            Text("Sidenote")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            Text(versionString)
+                .font(.footnote)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.top, 32)
+        .padding(.bottom, 40)
+    }
+}
+
+struct HomeScreenWidgetPreview: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var text: String
-    var appearance: LiveAppearance
+    var font: Font
+
+    @State private var widgetOffset: CGFloat = 0
+    @State private var widgetScale: CGFloat = 1
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(Color(uiColor: .tertiarySystemFill))
-                .frame(height: 280)
 
-            VStack {
+            VStack(spacing: 0) {
+                Capsule()
+                    .fill(Color.primary.opacity(0.85))
+                    .frame(width: 92, height: 24)
+                    .padding(.top, 16)
+
                 Spacer()
+
                 Text(text)
-                    .font(.body)
+                    .font(font)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.85)
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .background(
+                        Color(uiColor: .secondarySystemGroupedBackground),
+                        in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    )
+                    .shadow(color: .black.opacity(0.08), radius: 12, y: 6)
+                    .padding(.horizontal, 24)
+                    .offset(y: widgetOffset)
+                    .scaleEffect(widgetScale)
+
+                Spacer()
+            }
+            .padding(.bottom, 12)
+        }
+        .frame(height: 260)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Home Screen widget preview")
+        .onAppear(perform: startAnimation)
+    }
+
+    private func startAnimation() {
+        guard !reduceMotion else { return }
+
+        withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
+            widgetOffset = -8
+        }
+
+        withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
+            widgetScale = 1.02
+        }
+    }
+}
+
+struct LiveActivityPreview: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var text: String
+    var appearance: LiveAppearance
+    var animated: Bool = false
+
+    @State private var bannerOffset: CGFloat = -72
+    @State private var bannerOpacity: Double = 0
+    @State private var islandExpanded = false
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color(uiColor: .tertiarySystemFill))
+
+            VStack(spacing: 0) {
+                Capsule()
+                    .fill(Color.primary.opacity(islandExpanded ? 0.18 : 0.85))
+                    .frame(width: islandExpanded ? 180 : 92, height: islandExpanded ? 34 : 24)
+                    .overlay {
+                        if islandExpanded {
+                            Text(text)
+                                .font(.caption2)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                                .padding(.horizontal, 12)
+                        }
+                    }
+                    .padding(.top, 16)
+                    .animation(.spring(duration: 0.7, bounce: 0.25), value: islandExpanded)
+
+                Spacer()
+
+                Text(text)
+                    .font(.body)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.85)
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background {
+                        if appearance == .clear {
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(.ultraThinMaterial)
+                        } else {
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                        }
+                    }
                     .padding(.horizontal, 18)
-                    .opacity(appearance == .clear ? 0.92 : 1)
+                    .offset(y: bannerOffset)
+                    .opacity(bannerOpacity)
 
                 HStack {
                     Circle()
@@ -324,8 +526,54 @@ struct LiveActivityPreview: View {
                 .padding(.bottom, 20)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .frame(height: 280)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Lock Screen preview")
+        .onAppear {
+            if animated {
+                startAnimation()
+            } else {
+                bannerOffset = 0
+                bannerOpacity = 1
+            }
+        }
+    }
+
+    private func startAnimation() {
+        guard !reduceMotion else {
+            bannerOffset = 0
+            bannerOpacity = 1
+            return
+        }
+
+        func playCycle() {
+            bannerOffset = -72
+            bannerOpacity = 0
+            islandExpanded = false
+
+            withAnimation(.spring(duration: 0.75, bounce: 0.28).delay(0.35)) {
+                bannerOffset = 0
+                bannerOpacity = 1
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+                withAnimation(.spring(duration: 0.55, bounce: 0.15)) {
+                    islandExpanded = true
+                }
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.8) {
+                withAnimation(.easeInOut(duration: 0.45)) {
+                    bannerOpacity = 0
+                    bannerOffset = -24
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                    playCycle()
+                }
+            }
+        }
+
+        playCycle()
     }
 }

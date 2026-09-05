@@ -15,19 +15,36 @@ struct SidenoteActivityAttributes: ActivityAttributes {
 
 enum SidenoteFontChoice: String, Codable, CaseIterable, Identifiable, Hashable {
     case system
-    case newYork
-    case georgia
     case mono
+    case serif
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .system: "System"
-        case .newYork: "New York"
-        case .georgia: "Georgia"
+        case .system: "Default"
         case .mono: "Mono"
+        case .serif: "Serif"
         }
+    }
+
+    /// Maps persisted / decoded values, including legacy font names.
+    static func resolved(_ raw: String?) -> SidenoteFontChoice {
+        switch raw {
+        case "mono": .mono
+        case "serif", "newYork", "georgia": .serif
+        default: .system
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self = Self.resolved(try container.decode(String.self))
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
     }
 }
 
@@ -70,7 +87,6 @@ enum LiveAppearance: String, Codable, CaseIterable, Identifiable, Hashable {
 }
 
 enum AppAppearance: String, Codable, CaseIterable, Identifiable, Hashable {
-    case system
     case light
     case dark
 
@@ -78,7 +94,6 @@ enum AppAppearance: String, Codable, CaseIterable, Identifiable, Hashable {
 
     var displayName: String {
         switch self {
-        case .system: "System"
         case .light: "Light"
         case .dark: "Dark"
         }

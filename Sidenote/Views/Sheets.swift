@@ -23,7 +23,6 @@ struct EditEntryView: View {
                     isFocused: $isFocused,
                     droppingText: nil,
                     dropProgress: 0,
-                    showEarlierCue: false,
                     font: settings.captureFont,
                     uiFont: settings.captureUIFont
                 )
@@ -40,11 +39,7 @@ struct EditEntryView: View {
                     Text("Edit")
                         .font(.system(.headline, weight: .semibold))
                 }
-                ToolbarItem(placement: .topBarLeading) {
-                    CircleIconButton(action: { dismiss() }, accessibilityLabel: "Close") {
-                        Image(systemName: "xmark")
-                    }
-                }
+                CloseToolbarButton(action: { dismiss() })
             }
             .toolbarBackground(.hidden, for: .navigationBar)
         }
@@ -63,6 +58,9 @@ struct EditEntryView: View {
         entry.updatedAt = .now
         try? modelContext.save()
         Task { await LiveActivityManager.shared.update(entry: entry, settings: settings) }
+        if WidgetDataStore.load().entryID == entry.id {
+            WidgetSync.update(latestEntry: entry, settings: settings)
+        }
         dismiss()
     }
 }
@@ -120,11 +118,7 @@ struct SearchView: View {
             .navigationTitle("Search")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    CircleIconButton(action: { dismiss() }, accessibilityLabel: "Close") {
-                        Image(systemName: "xmark")
-                    }
-                }
+                CloseToolbarButton(action: { dismiss() })
             }
         }
         .onAppear { focused = true }
@@ -195,11 +189,7 @@ struct RecentlyRemovedView: View {
             .navigationTitle("Recently Removed")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    CircleIconButton(action: { dismiss() }, accessibilityLabel: "Close") {
-                        Image(systemName: "xmark")
-                    }
-                }
+                CloseToolbarButton(action: { dismiss() })
             }
             .confirmationDialog(
                 "Delete this sidenote permanently?",

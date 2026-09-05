@@ -25,36 +25,89 @@ struct MainView: View {
     @State private var editingEntry: SidenoteEntry?
     @State private var sharePayload: SharePayload?
     @State private var scrolledIntoPast = false
-    @State private var hasDiscoveredEarlier = AppGroup.defaults.bool(forKey: SettingsKey.discoveredEarlier)
+    @State private var scrollOffsetY: CGFloat = 0
+    @State private var viewportHeight: CGFloat = 0
     @State private var pendingScrollID: UUID?
     @State private var lastBackground: Date?
     @State private var preservePositionOnReturn = false
     @State private var liveActivitiesUnavailable = false
     @State private var liveManager = LiveActivityManager.shared
 
+    /// Extra space below the capture viewport so day headers never peek on any phone size.
+    private let earlierNotesInset: CGFloat = 88
+
     private var groups: [DayGroup] {
         StreamGrouping.groups(from: entries)
     }
 
-    var body: some View {
-        ZStack {
-            Color(uiColor: .systemGroupedBackground)
-                .ignoresSafeArea()
+    private func captureHideThreshold(for height: CGFloat) -> CGFloat {
+        // Hide when the day heading reaches the prompt — not the first timestamp below it.
+        // Matches DayHeader bottom padding + heading height + EntryRow top padding.
+        let firstTimestampLeadIn: CGFloat = 4 + 14 + 18
+        return max(120, height * 0.5 + earlierNotesInset * 0.75 - firstTimestampLeadIn)
+    }
 
-            VStack(spacing: 0) {
-                header
-                scrollSurface
-            }
+    private func capturePromptVisible(for height: CGFloat) -> Bool {
+        isCaptureFocused || scrollOffsetY < captureHideThreshold(for: height)
+    }
+
+    var body: some View {
+        NavigationStack {
+            scrollSurface
+                .background(Color(uiColor: .systemGroupedBackground))
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        shareControl
+                    }
+
+                    ToolbarItem(placement: .principal) {
+                        Text("Sidenote")
+                            .font(.system(.title3, weight: .semibold))
+                            .opacity(isCaptureFocused ? 0.45 : 1)
+                            .animation(.easeInOut(duration: 0.2), value: isCaptureFocused)
+                    }
+
+                    if scrolledIntoPast {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Search", systemImage: "magnifyingglass") {
+                                showSearch = true
+                            }
+                        }
+                    }
+
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Button {
+                                showRemoved = true
+                            } label: {
+                                Label("Recently Removed", systemImage: "trash")
+                            }
+                            Button("Settings", systemImage: "gear") {
+                                showSettings = true
+                            }
+                            .labelStyle(.titleAndIcon)
+                        } label: {
+                            Label("More", systemImage: "ellipsis")
+                        }
+                    }
+                }
+                .toolbarTitleDisplayMode(.inline)
+                .toolbarBackground(.hidden, for: .navigationBar)
+                .animation(.easeInOut(duration: 0.2), value: scrolledIntoPast)
         }
         .safeAreaInset(edge: .bottom) {
-            if isCaptureFocused {
-                DoneButton(action: commit)
-                    .padding(.horizontal, 28)
-                    .padding(.bottom, 8)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            Group {
+                if isCaptureFocused {
+                    DoneButton(action: commit)
+                        .padding(.horizontal, 28)
+                        .padding(.bottom, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(Color(uiColor: .systemGroupedBackground))
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
+            .animation(.easeInOut(duration: 0.22), value: isCaptureFocused)
         }
-        .animation(.easeInOut(duration: 0.22), value: isCaptureFocused)
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .environment(settings)
@@ -85,133 +138,144 @@ struct MainView: View {
             DraftStore.save(newValue)
         }
         .onChange(of: scenePhase, handleScenePhase)
-        .onChange(of: settings.font) { _, _ in refreshLive() }
-        .onChange(of: settings.textSize) { _, _ in refreshLive() }
+        .onChange(of: settings.font) { _, _ in
+            refreshLive()
+            WidgetSync.update(latestEntry: entries.first, settings: settings)
+        }
+        .onChange(of: settings.textSize) { _, _ in
+            refreshLive()
+            WidgetSync.update(latestEntry: entries.first, settings: settings)
+        }
         .onChange(of: settings.liveAppearance) { _, _ in refreshLive() }
+        .onChange(of: entries.count) { _, _ in
+            WidgetSync.update(latestEntry: entries.first, settings: settings)
+        }
         .onAppear {
             RemovedPurger.purge(in: modelContext)
+            WidgetSync.update(latestEntry: entries.first, settings: settings)
         }
         .onOpenURL(perform: handleURL)
     }
 
-    private var header: some View {
-        HStack {
-            if entries.isEmpty {
-                CircleIconButton(action: {}, accessibilityLabel: "Share") {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                .opacity(0.28)
+    @ViewBuilder
+    private var shareControl: some View {
+        if entries.isEmpty {
+            Button("Share", systemImage: "square.and.arrow.up") {}
                 .disabled(true)
-            } else {
-                ShareLink(
-                    item: ExportService.plainText(entries: entries),
-                    preview: SharePreview("Sidenote")
-                ) {
-                    CircleIconVisual(systemName: "square.and.arrow.up")
-                }
-                .accessibilityLabel("Share")
-            }
-
-            Spacer(minLength: 8)
-
-            Text("Sidenote")
-                .font(.system(.title3, weight: .semibold))
-                .opacity(isCaptureFocused ? 0.45 : 1)
-
-            Spacer(minLength: 8)
-
-            HStack(spacing: 10) {
-                if scrolledIntoPast {
-                    CircleIconButton(action: { showSearch = true }, accessibilityLabel: "Search") {
-                        Image(systemName: "magnifyingglass")
-                    }
-                    .transition(.opacity)
-                }
-
-                Menu {
-                    Button {
-                        showRemoved = true
-                    } label: {
-                        Label("Recently Removed", systemImage: "clock.arrow.counterclockwise")
-                    }
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Label("Settings", systemImage: "gearshape")
-                    }
-                } label: {
-                    CircleIconVisual(systemName: "ellipsis")
-                }
-                .accessibilityLabel("More")
+                .opacity(0.28)
+        } else {
+            ShareLink(
+                item: ExportService.plainText(entries: entries),
+                preview: SharePreview("Sidenote", icon: Image("ShareIcon"))
+            ) {
+                Label("Share", systemImage: "square.and.arrow.up")
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 4)
-        .padding(.bottom, 8)
-        .animation(.easeInOut(duration: 0.2), value: scrolledIntoPast)
-        .animation(.easeInOut(duration: 0.2), value: isCaptureFocused)
     }
 
     private var scrollSurface: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    CaptureSurface(
-                        text: $draft,
-                        isFocused: $isCaptureFocused,
-                        droppingText: droppingText,
-                        dropProgress: dropProgress,
-                        showEarlierCue: showEarlierCue,
-                        font: settings.captureFont,
-                        uiFont: settings.captureUIFont
-                    )
-                    .containerRelativeFrame(.vertical)
-                    .id("capture")
+        GeometryReader { geo in
+            let height = geo.size.height
+            let promptVisible = capturePromptVisible(for: height)
+            let atCaptureHome = scrollOffsetY < 12
 
-                    ThoughtStream(
-                        groups: groups,
-                        isEmpty: entries.isEmpty,
-                        liveEntryID: liveManager.liveEntryID,
-                        streamFont: settings.streamFont,
-                        timestampFont: settings.timestampFont,
-                        headingFont: settings.headingFont,
-                        onEdit: { editingEntry = $0 },
-                        onShare: { sharePayload = SharePayload(text: $0.text) },
-                        onRemove: remove,
-                        onGoLive: goLive,
-                        onStopLive: { entry in
-                            Task { await liveManager.stopIfEntry(entry.id) }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        CaptureSurface(
+                            text: $draft,
+                            isFocused: $isCaptureFocused,
+                            droppingText: droppingText,
+                            dropProgress: dropProgress,
+                            isPromptVisible: promptVisible,
+                            canActivate: promptVisible,
+                            allowsExpandedTap: atCaptureHome,
+                            onActivate: {
+                                guard scrollOffsetY > 12 else { return }
+                                returnNotesToHome(using: proxy)
+                            },
+                            font: settings.captureFont,
+                            uiFont: settings.captureUIFont
+                        )
+                        .containerRelativeFrame(.vertical)
+                        .id("home")
+
+                        // Keep the stream out of layout while capturing so it can't
+                        // reflow into the gap above the rising Done/keyboard.
+                        if !isCaptureFocused {
+                            Color.clear
+                                .frame(height: earlierNotesInset)
+                                .accessibilityHidden(true)
+
+                            ThoughtStream(
+                                groups: groups,
+                                isEmpty: entries.isEmpty,
+                                liveEntryID: liveManager.liveEntryID,
+                                streamFont: settings.streamFont,
+                                timestampFont: settings.timestampFont,
+                                headingFont: settings.headingFont,
+                                onEdit: { editingEntry = $0 },
+                                onShare: { sharePayload = SharePayload(text: $0.text) },
+                                onRemove: remove,
+                                onGoLive: goLive,
+                                onStopLive: { entry in
+                                    Task { await liveManager.stopIfEntry(entry.id) }
+                                }
+                            )
                         }
-                    )
-                }
-            }
-            .scrollDismissesKeyboard(.interactively)
-            .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { _, y in
-                scrolledIntoPast = y > 80
-                if y > 120 { markDiscovered() }
-            }
-            .onChange(of: pendingScrollID) { _, id in
-                guard let id else { return }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    withAnimation(.easeInOut(duration: 0.35)) {
-                        proxy.scrollTo(id, anchor: .center)
                     }
-                    pendingScrollID = nil
+                    .transaction(value: isCaptureFocused) { $0.animation = nil }
                 }
-            }
-            .onAppear {
-                proxy.scrollTo("capture", anchor: .top)
+                .scrollDisabled(isCaptureFocused)
+                .scrollDismissesKeyboard(.interactively)
+                .ignoresSafeArea(.keyboard, edges: .bottom)
+                .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { _, y in
+                    scrollOffsetY = max(0, y)
+                    scrolledIntoPast = y > 80
+                }
+                .onChange(of: isCaptureFocused) { _, focused in
+                    if focused {
+                        returnNotesToHome(using: proxy, animated: false)
+                    }
+                }
+                .onChange(of: pendingScrollID) { _, id in
+                    guard let id else { return }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            proxy.scrollTo(id, anchor: .center)
+                        }
+                        pendingScrollID = nil
+                    }
+                }
+                .onAppear {
+                    viewportHeight = height
+                    returnNotesToHome(using: proxy, animated: false)
+                }
+                .onChange(of: height) { _, newHeight in
+                    viewportHeight = newHeight
+                }
             }
         }
+        .animation(.easeInOut(duration: 0.2), value: capturePromptVisible(for: viewportHeight))
     }
 
-    private var showEarlierCue: Bool {
-        !entries.isEmpty && !hasDiscoveredEarlier && !isCaptureFocused && !scrolledIntoPast
+    private func returnNotesToHome(using proxy: ScrollViewProxy, animated: Bool = true) {
+        let scroll = {
+            proxy.scrollTo("home", anchor: .top)
+        }
+
+        if animated {
+            withAnimation(.easeInOut(duration: 0.35)) {
+                scroll()
+            }
+        } else {
+            scroll()
+        }
     }
 
     private func commit() {
         let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        isCaptureFocused = false
+        dismissCapture()
 
         guard !trimmed.isEmpty else {
             draft = ""
@@ -220,9 +284,11 @@ struct MainView: View {
         }
 
         HapticManager.commit()
-        modelContext.insert(SidenoteEntry(text: trimmed))
+        let entry = SidenoteEntry(text: trimmed)
+        modelContext.insert(entry)
         try? modelContext.save()
         DraftStore.clear()
+        WidgetSync.update(latestEntry: entry, settings: settings)
 
         if reduceMotion {
             draft = ""
@@ -240,12 +306,24 @@ struct MainView: View {
         }
     }
 
+    private func dismissCapture() {
+        isCaptureFocused = false
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+    }
+
     private func remove(_ entry: SidenoteEntry) {
         let id = entry.id
         entry.deletedAt = .now
         try? modelContext.save()
         HapticManager.remove()
         Task { await liveManager.stopIfEntry(id) }
+        let nextLatest = entries.first(where: { $0.id != id })
+        WidgetSync.update(latestEntry: nextLatest, settings: settings)
     }
 
     private func goLive(_ entry: SidenoteEntry) {
@@ -262,12 +340,6 @@ struct MainView: View {
         guard let id = liveManager.liveEntryID,
               let entry = entries.first(where: { $0.id == id }) else { return }
         Task { await liveManager.update(entry: entry, settings: settings) }
-    }
-
-    private func markDiscovered() {
-        guard !hasDiscoveredEarlier else { return }
-        hasDiscoveredEarlier = true
-        AppGroup.defaults.set(true, forKey: SettingsKey.discoveredEarlier)
     }
 
     private func handleScenePhase(_ old: ScenePhase, _ phase: ScenePhase) {

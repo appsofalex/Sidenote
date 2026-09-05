@@ -22,8 +22,8 @@ final class SidenoteSettings {
 
     init() {
         let defaults = AppGroup.defaults
-        appearance = AppAppearance(rawValue: defaults.string(forKey: SettingsKey.appearance) ?? "") ?? .system
-        font = SidenoteFontChoice(rawValue: defaults.string(forKey: SettingsKey.font) ?? "") ?? .system
+        appearance = AppAppearance(rawValue: defaults.string(forKey: SettingsKey.appearance) ?? "") ?? .light
+        font = SidenoteFontChoice.resolved(defaults.string(forKey: SettingsKey.font))
         textSize = SidenoteTextSize(rawValue: defaults.string(forKey: SettingsKey.textSize) ?? "") ?? .regular
         liveAppearance = LiveAppearance(rawValue: defaults.string(forKey: SettingsKey.liveAppearance) ?? "") ?? .default
     }
@@ -56,9 +56,8 @@ final class SidenoteSettings {
 }
 
 extension AppAppearance {
-    var colorScheme: ColorScheme? {
+    var colorScheme: ColorScheme {
         switch self {
-        case .system: nil
         case .light: .light
         case .dark: .dark
         }

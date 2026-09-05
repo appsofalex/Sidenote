@@ -5,6 +5,7 @@ import WidgetKit
 @main
 struct SidenoteLiveActivityBundle: WidgetBundle {
     var body: some Widget {
+        SidenoteHomeWidget()
         SidenoteLiveActivityWidget()
     }
 }
