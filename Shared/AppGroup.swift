@@ -17,4 +17,5 @@ enum SettingsKey {
     static let draft = "sidenote.draft"
     static let lastBackgroundDate = "sidenote.lastBackgroundDate"
     static let widgetSnapshot = "sidenote.widgetSnapshot"
+    static let hasCreatedNote = "sidenote.hasCreatedNote"
 }

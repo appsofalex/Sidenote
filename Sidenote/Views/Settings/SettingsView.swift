@@ -237,7 +237,7 @@ struct LiveActivitySettingsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Live Activity")
                             .font(.headline)
-                        Text("After you go live, a sidenote can appear on the Lock Screen and in the Dynamic Island on supported iPhones. It can remain active for up to 8 hours.")
+                        Text("Long-press any sidenote in the stream, then tap Go Live. It appears on the Lock Screen and in the Dynamic Island on supported iPhones for up to 8 hours. Long-press again and tap Stop Live to end it.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -292,10 +292,29 @@ struct LiveActivitySettingsView: View {
 struct AboutView: View {
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 20) {
                 Text("Sidenote keeps your thoughts on this iPhone. There is no account, and nothing is sent to a server.")
-                Text("Removed sidenotes stay on device for 30 days, then they are deleted.")
-                Text("If you go live, the current thought is shown by iOS on the Lock Screen and Dynamic Island until you stop it or it expires.")
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Features")
+                        .font(.headline)
+                    labeledFeature(
+                        title: "Capture",
+                        detail: "Tap the prompt on the home screen, write a thought, then tap Done. Swipe up to browse earlier sidenotes."
+                    )
+                    labeledFeature(
+                        title: "Go Live",
+                        detail: "Long-press a sidenote and choose Go Live to show it on the Lock Screen and Dynamic Island. Choose Stop Live to end it."
+                    )
+                    labeledFeature(
+                        title: "Widget",
+                        detail: "Add the Sidenote Home Screen widget from the iOS widget gallery. See Settings → Widget for steps."
+                    )
+                    labeledFeature(
+                        title: "Edit, share, remove",
+                        detail: "Long-press a sidenote for Edit, Share, or Remove. Removed notes stay on device for 30 days, then are deleted."
+                    )
+                }
             }
             .font(.body)
             .padding(20)
@@ -303,6 +322,17 @@ struct AboutView: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("About Sidenote")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func labeledFeature(title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            Text(detail)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 

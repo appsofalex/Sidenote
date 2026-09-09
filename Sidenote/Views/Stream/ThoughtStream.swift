@@ -71,7 +71,7 @@ struct EntryRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityHint("Actions available from a long press.")
+        .accessibilityHint("Actions available from a long press. Choose Go Live to show this note on the Lock Screen.")
     }
 }
 

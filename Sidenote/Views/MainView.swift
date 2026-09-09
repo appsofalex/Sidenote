@@ -1,6 +1,7 @@
 import ActivityKit
 import SwiftData
 import SwiftUI
+import TipKit
 
 struct MainView: View {
     @Environment(\.modelContext) private var modelContext
@@ -32,6 +33,10 @@ struct MainView: View {
     @State private var preservePositionOnReturn = false
     @State private var liveActivitiesUnavailable = false
     @State private var liveManager = LiveActivityManager.shared
+    @State private var onboardingTips = TipGroup(.ordered) {
+        ScrollUpTip()
+        GoLiveTip()
+    }
 
     /// Extra space below the capture viewport so day headers never peek on any phone size.
     private let earlierNotesInset: CGFloat = 88
@@ -104,9 +109,18 @@ struct MainView: View {
                         .frame(maxWidth: .infinity)
                         .background(Color(uiColor: .systemGroupedBackground))
                         .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else if !entries.isEmpty, let tip = onboardingTips.currentTip {
+                    TipView(tip)
+                        .tipBackground(Color(uiColor: .secondarySystemGroupedBackground))
+                        .tipCornerRadius(20, antialiased: true)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .id(tip.id)
                 }
             }
             .animation(.easeInOut(duration: 0.22), value: isCaptureFocused)
+            .animation(.easeInOut(duration: 0.22), value: entries.isEmpty)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
@@ -132,7 +146,7 @@ struct MainView: View {
         .alert("Live Activities are off", isPresented: $liveActivitiesUnavailable) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Turn on Live Activities for Sidenote in Settings to keep a thought on the Lock Screen.")
+            Text("Turn on Live Activities for Sidenote in iOS Settings → Sidenote to keep a thought on the Lock Screen. Then long-press a note and tap Go Live.")
         }
         .onChange(of: draft) { _, newValue in
             DraftStore.save(newValue)
@@ -153,6 +167,9 @@ struct MainView: View {
         .onAppear {
             RemovedPurger.purge(in: modelContext)
             WidgetSync.update(latestEntry: entries.first, settings: settings)
+            if !entries.isEmpty {
+                markHasCreatedNote()
+            }
         }
         .onOpenURL(perform: handleURL)
     }
@@ -232,6 +249,9 @@ struct MainView: View {
                 .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { _, y in
                     scrollOffsetY = max(0, y)
                     scrolledIntoPast = y > 80
+                    if y > 48 {
+                        ScrollUpTip().invalidate(reason: .actionPerformed)
+                    }
                 }
                 .onChange(of: isCaptureFocused) { _, focused in
                     if focused {
@@ -289,6 +309,7 @@ struct MainView: View {
         try? modelContext.save()
         DraftStore.clear()
         WidgetSync.update(latestEntry: entry, settings: settings)
+        markHasCreatedNote()
 
         if reduceMotion {
             draft = ""
@@ -333,6 +354,7 @@ struct MainView: View {
                 return
             }
             await liveManager.start(entry: entry, settings: settings)
+            GoLiveTip().invalidate(reason: .actionPerformed)
         }
     }
 
@@ -366,6 +388,11 @@ struct MainView: View {
         let idString = url.pathComponents.last ?? url.host
         guard let idString, let id = UUID(uuidString: idString) else { return }
         pendingScrollID = id
+    }
+
+    private func markHasCreatedNote() {
+        AppGroup.defaults.set(true, forKey: SettingsKey.hasCreatedNote)
+        FirstUseTips.hasCreatedNote = true
     }
 }
 
