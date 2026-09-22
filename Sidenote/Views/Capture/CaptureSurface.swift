@@ -79,9 +79,7 @@ struct CaptureSurface: View {
                 }
 
                 if isPromptVisible, let droppingText {
-                    Text(droppingText)
-                        .font(font)
-                        .foregroundStyle(.primary)
+                    LinkifiedText(text: droppingText, font: font, linkify: false)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .offset(y: contentTopInset + dropProgress * max(220, geo.size.height * 0.45))
                         .opacity(1 - dropProgress)

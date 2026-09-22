@@ -67,7 +67,7 @@ struct SidenoteHomeWidgetView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Text(snapshot.text)
+            Text(NoteMarkup.attributedString(snapshot.text, linkify: false))
                 .font(
                     SidenoteTypography.font(
                         snapshot.font,

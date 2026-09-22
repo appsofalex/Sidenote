@@ -237,7 +237,8 @@ struct MainView: View {
                                 onGoLive: goLive,
                                 onStopLive: { entry in
                                     Task { await liveManager.stopIfEntry(entry.id) }
-                                }
+                                },
+                                onToggleBold: toggleBold
                             )
                         }
                     }
@@ -355,6 +356,16 @@ struct MainView: View {
             }
             await liveManager.start(entry: entry, settings: settings)
             GoLiveTip().invalidate(reason: .actionPerformed)
+        }
+    }
+
+    private func toggleBold(_ entry: SidenoteEntry) {
+        entry.text = NoteMarkup.toggleFullyBold(entry.text)
+        entry.updatedAt = .now
+        try? modelContext.save()
+        Task { await liveManager.update(entry: entry, settings: settings) }
+        if WidgetDataStore.load().entryID == entry.id {
+            WidgetSync.update(latestEntry: entry, settings: settings)
         }
     }
 

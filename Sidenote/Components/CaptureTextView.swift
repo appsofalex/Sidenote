@@ -5,6 +5,7 @@ import UIKit
 /// inside the capture column instead of running off-screen.
 final class CaptureUITextView: UITextView {
     var layoutContentWidth: CGFloat = 0
+    var baseFont: UIFont = .preferredFont(forTextStyle: .body)
 
     override init(frame: CGRect, textContainer: NSTextContainer?) {
         super.init(frame: frame, textContainer: textContainer)
@@ -29,6 +30,7 @@ final class CaptureUITextView: UITextView {
         textContainer.maximumNumberOfLines = 0
         textContainer.widthTracksTextView = false
         textContainer.heightTracksTextView = false
+        allowsEditingTextAttributes = true
     }
 
     override func layoutSubviews() {
@@ -44,6 +46,22 @@ final class CaptureUITextView: UITextView {
         visible.origin.x = 0
         super.scrollRectToVisible(visible, animated: animated)
         clampHorizontalOffset()
+    }
+
+    override func buildMenu(with builder: UIMenuBuilder) {
+        super.buildMenu(with: builder)
+
+        let isBold = selectionOrTypingIsBold()
+        let action = UIAction(
+            title: isBold ? "Unbold" : "Bold",
+            image: UIImage(systemName: "bold")
+        ) { [weak self] _ in
+            self?.toggleBold()
+        }
+        builder.insertChild(
+            UIMenu(options: .displayInline, children: [action]),
+            atStartOfMenu: .standardEdit
+        )
     }
 
     func applyTextContainerWidth() {
@@ -70,12 +88,93 @@ final class CaptureUITextView: UITextView {
         applyTextContainerWidth()
         layoutManager.ensureLayout(for: textContainer)
         let usedRect = layoutManager.usedRect(for: textContainer)
-        return max(usedRect.height, font?.lineHeight ?? 0)
+        return max(usedRect.height, font?.lineHeight ?? baseFont.lineHeight)
     }
 
     func clampHorizontalOffset() {
         guard contentOffset.x != 0 else { return }
         setContentOffset(CGPoint(x: 0, y: contentOffset.y), animated: false)
+    }
+
+    func applyMarkdown(_ markdown: String, font: UIFont) {
+        baseFont = font
+        attributedText = NoteMarkup.nsAttributedString(markdown, font: font)
+        typingAttributes = NoteMarkup.typingAttributes(font: font)
+        self.font = font
+    }
+
+    func remappedBaseFont(_ font: UIFont) {
+        guard baseFont != font else { return }
+        baseFont = font
+        self.font = font
+
+        guard textStorage.length > 0 else {
+            typingAttributes = NoteMarkup.typingAttributes(font: font)
+            return
+        }
+
+        let selected = selectedRange
+        let storage = textStorage
+        storage.beginEditing()
+        storage.enumerateAttribute(.font, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
+            let current = (value as? UIFont) ?? font
+            storage.addAttribute(.font, value: font.sidenoteByPreservingWeight(of: current), range: range)
+        }
+        storage.endEditing()
+        selectedRange = selected
+
+        let typingBold = (typingAttributes[.font] as? UIFont)?.sidenoteIsBold == true
+        typingAttributes = NoteMarkup.typingAttributes(font: font, bold: typingBold)
+    }
+
+    func currentMarkdown() -> String {
+        NoteMarkup.markdown(from: attributedText)
+    }
+
+    private func selectionOrTypingIsBold() -> Bool {
+        let range = selectedRange
+        if range.length == 0 {
+            return (typingAttributes[.font] as? UIFont)?.sidenoteIsBold == true
+        }
+
+        var allBold = true
+        textStorage.enumerateAttribute(.font, in: range) { value, _, stop in
+            let font = (value as? UIFont) ?? baseFont
+            if !font.sidenoteIsBold {
+                allBold = false
+                stop.pointee = true
+            }
+        }
+        return allBold
+    }
+
+    func toggleBold() {
+        let range = selectedRange
+        if range.length == 0 {
+            let makeBold = (typingAttributes[.font] as? UIFont)?.sidenoteIsBold != true
+            typingAttributes = NoteMarkup.typingAttributes(font: baseFont, bold: makeBold)
+            return
+        }
+
+        var allBold = true
+        textStorage.enumerateAttribute(.font, in: range) { value, _, stop in
+            let font = (value as? UIFont) ?? baseFont
+            if !font.sidenoteIsBold {
+                allBold = false
+                stop.pointee = true
+            }
+        }
+
+        textStorage.beginEditing()
+        textStorage.enumerateAttribute(.font, in: range) { value, subrange, _ in
+            let current = (value as? UIFont) ?? baseFont
+            let updated = allBold ? current.sidenoteRegular() : current.sidenoteBold()
+            textStorage.addAttribute(.font, value: updated, range: subrange)
+        }
+        textStorage.endEditing()
+
+        typingAttributes = NoteMarkup.typingAttributes(font: baseFont, bold: !allBold)
+        delegate?.textViewDidChange?(self)
     }
 }
 
@@ -101,15 +200,13 @@ struct CaptureTextView: UIViewRepresentable {
         view.adjustsFontForContentSizeCategory = true
         view.tintColor = .label
         view.textColor = .label
-        view.font = font
-        view.text = text
-        view.allowsEditingTextAttributes = false
         view.isScrollEnabled = true
         view.textContentType = .none
         view.smartDashesType = .yes
         view.smartQuotesType = .yes
         view.autocorrectionType = .yes
         view.layoutContentWidth = textWidth
+        view.applyMarkdown(text, font: font)
         return view
     }
 
@@ -118,12 +215,11 @@ struct CaptureTextView: UIViewRepresentable {
         coordinator.parent = self
 
         view.layoutContentWidth = textWidth
+        view.remappedBaseFont(font)
 
-        if view.font != font {
-            view.font = font
-        }
-        if view.text != text, text.isEmpty || !coordinator.isEditing {
-            view.text = text
+        let currentMarkdown = view.currentMarkdown()
+        if currentMarkdown != text, text.isEmpty || !coordinator.isEditing {
+            view.applyMarkdown(text, font: font)
         }
 
         view.isUserInteractionEnabled = acceptsTouches
@@ -156,8 +252,8 @@ struct CaptureTextView: UIViewRepresentable {
             if view.isFirstResponder {
                 view.resignFirstResponder()
             }
-            if text.isEmpty, !view.text.isEmpty {
-                view.text = ""
+            if text.isEmpty, !view.currentMarkdown().isEmpty {
+                view.applyMarkdown("", font: font)
             }
         }
     }
@@ -181,7 +277,7 @@ struct CaptureTextView: UIViewRepresentable {
 
         func textViewDidChange(_ textView: UITextView) {
             guard let textView = textView as? CaptureUITextView else { return }
-            parent.text = textView.text
+            parent.text = textView.currentMarkdown()
             textView.applyTextContainerWidth()
             reportContentHeight(from: textView)
             textView.clampHorizontalOffset()
@@ -212,8 +308,9 @@ struct CaptureTextView: UIViewRepresentable {
 
         func textViewDidEndEditing(_ textView: UITextView) {
             isEditing = false
-            if parent.text.isEmpty, !textView.text.isEmpty {
-                textView.text = ""
+            guard let textView = textView as? CaptureUITextView else { return }
+            if parent.text.isEmpty, !textView.currentMarkdown().isEmpty {
+                textView.applyMarkdown("", font: parent.font)
             }
         }
     }

@@ -22,7 +22,7 @@ struct SidenoteLiveActivityWidget: Widget {
                         .padding(.leading, 4)
                 }
                 DynamicIslandExpandedRegion(.center) {
-                    Text(context.state.text)
+                    Text(NoteMarkup.attributedString(context.state.text, linkify: false))
                         .font(SidenoteTypography.font(context.state.font, size: SidenoteTypography.liveSize(context.state.textSize)))
                         .lineLimit(3)
                         .minimumScaleFactor(0.8)
@@ -50,7 +50,7 @@ struct LockScreenLiveView: View {
     var state: SidenoteActivityAttributes.ContentState
 
     var body: some View {
-        Text(state.text)
+        Text(NoteMarkup.attributedString(state.text, linkify: false))
             .font(SidenoteTypography.font(state.font, size: SidenoteTypography.liveSize(state.textSize)))
             .foregroundStyle(.primary)
             .frame(maxWidth: .infinity, alignment: .leading)

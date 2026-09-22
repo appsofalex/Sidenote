@@ -11,6 +11,11 @@ struct EntryRow: View {
     var onRemove: () -> Void
     var onGoLive: () -> Void
     var onStopLive: () -> Void
+    var onToggleBold: () -> Void
+
+    private var isBold: Bool {
+        NoteMarkup.isFullyBold(entry.text)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -27,11 +32,8 @@ struct EntryRow: View {
                 }
             }
 
-            Text(entry.text)
-                .font(streamFont)
-                .foregroundStyle(.primary)
+            LinkifiedText(text: entry.text, font: streamFont)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
         }
         .padding(.vertical, 18)
         .contentShape(Rectangle())
@@ -48,6 +50,12 @@ struct EntryRow: View {
                 } label: {
                     Label("Go Live", systemImage: "record.circle")
                 }
+            }
+
+            Button {
+                onToggleBold()
+            } label: {
+                Label(isBold ? "Unbold" : "Bold", systemImage: "bold")
             }
 
             Button {
@@ -102,6 +110,7 @@ struct ThoughtStream: View {
     var onRemove: (SidenoteEntry) -> Void
     var onGoLive: (SidenoteEntry) -> Void
     var onStopLive: (SidenoteEntry) -> Void
+    var onToggleBold: (SidenoteEntry) -> Void
 
     var body: some View {
         LazyVStack(alignment: .leading, spacing: 0) {
@@ -125,7 +134,8 @@ struct ThoughtStream: View {
                             onShare: { onShare(entry) },
                             onRemove: { onRemove(entry) },
                             onGoLive: { onGoLive(entry) },
-                            onStopLive: { onStopLive(entry) }
+                            onStopLive: { onStopLive(entry) },
+                            onToggleBold: { onToggleBold(entry) }
                         )
                         .id(entry.id)
                     }

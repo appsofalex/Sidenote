@@ -10,7 +10,7 @@ enum WidgetSync {
         WidgetDataStore.save(
             WidgetSnapshot(
                 entryID: latestEntry.id,
-                text: latestEntry.preview,
+                text: latestEntry.text,
                 font: settings.font,
                 textSize: settings.textSize,
                 updatedAt: .now

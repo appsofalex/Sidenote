@@ -25,7 +25,7 @@ final class SidenoteEntry {
     var isRemoved: Bool { deletedAt != nil }
 
     var preview: String {
-        let collapsed = text
+        let collapsed = NoteMarkup.plainText(text)
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if collapsed.count <= 120 { return collapsed }
